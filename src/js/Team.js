@@ -1,13 +1,3 @@
-// export default class Team {
-//   constructor(characters) {
-//     this.characters = characters; // Массив объектов персонажей
-//   }
-
-//   get allCharacters() {
-//     return this.characters;
-//   }
-// }
-
 export default class Team {
   constructor(characters = []) {
     this.characters = characters;
@@ -17,12 +7,6 @@ export default class Team {
     this.characters.push(character);
   }
 }
-
-
-
-
-
-
 
 
 // export default class Team {
