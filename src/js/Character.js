@@ -12,13 +12,30 @@
  * undead
  * vampire
  */
+
 export default class Character {
   constructor(level, type = 'generic') {
+    if (new.target === Character) {
+      throw new Error("Нельзя создавать экземпляры класса Character напрямую.");
+    }
     this.level = level;
-    this.attack = 0;
-    this.defence = 0;
-    this.health = 50;
     this.type = type;
-    // TODO: выбросите исключение, если кто-то использует "new Character()"
+    this.health = 50;
   }
 }
+
+
+// export default class Character {
+//   constructor(level, type = 'generic') {
+//     if (new.target === Character) {
+//       throw new TypeError("Нельзя создать экземпляр абстрактного класса 'Character'");
+//     }
+
+//     this.level = level;
+//     this.attack = 0;
+//     this.defence = 0;
+//     this.health = 50;
+//     this.type = type;
+//   }
+// }
+

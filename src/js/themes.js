@@ -1,8 +1,17 @@
 const themes = {
-  prairie: 'prairie',
-  desert: 'desert',
-  arctic: 'arctic',
-  mountain: 'mountain',
+  1: 'prairie',
+  2: 'desert',
+  3: 'arctic',
+  4: 'mountain',
 };
+
+// Функция для получения темы по номеру уровня
+export function getTheme(level) {
+  if (!themes.hasOwnProperty(level)) {
+    throw new Error(`Тема для уровня ${level} не найдена`);
+  }
+  
+  return themes[level];
+}
 
 export default themes;

@@ -1,3 +1,13 @@
+import Team from './Team';
+import Bowman from './characters/Bowman';
+import Swordsman from './characters/Swordsman';
+import Magician from './characters/Magician';
+import Vampire from './characters/Vampire';
+import Undead from './characters/Undead';
+import Daemon from './characters/Daemon';
+
+export const playerClasses = [Bowman, Swordsman, Magician];
+export const enemyClasses = [Vampire, Undead, Daemon];
 /**
  * Формирует экземпляр персонажа из массива allowedTypes со
  * случайным уровнем от 1 до maxLevel
@@ -9,7 +19,11 @@
  *
  */
 export function* characterGenerator(allowedTypes, maxLevel) {
-  // TODO: write logic here
+  while (true) {
+    const CharacterType = allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
+    const level = Math.floor(Math.random() * maxLevel) + 1;
+    yield new CharacterType(level);
+  }
 }
 
 /**
@@ -19,6 +33,52 @@ export function* characterGenerator(allowedTypes, maxLevel) {
  * @param characterCount количество персонажей, которое нужно сформировать
  * @returns экземпляр Team, хранящий экземпляры персонажей. Количество персонажей в команде - characterCount
  * */
+
 export function generateTeam(allowedTypes, maxLevel, characterCount) {
-  // TODO: write logic here
+  const team = [];
+  const generator = characterGenerator(allowedTypes, maxLevel);
+  for (let i = 0; i < characterCount; i += 1) {
+    team.push(generator.next().value);
+  }
+  return new Team(team);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import Team from './Team';
+
+
+
+// export function* characterGenerator(allowedTypes, maxLevel) {
+//   while (true) {
+//     const randomClass = allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
+//     const level = Math.floor(Math.random() * maxLevel) + 1;
+//     yield new randomClass(level);
+//   }
+// }
+
+
+
+// export function generateTeam(allowedTypes, maxLevel, characterCount) {
+//   const team = [];
+//   const generator = characterGenerator(allowedTypes, maxLevel);
+//   for (let i = 0; i < characterCount; i++) {
+//     team.push(generator.next().value);
+//   }
+//   return new Team(team);
+// }
+
