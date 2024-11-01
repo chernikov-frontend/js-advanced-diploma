@@ -7,10 +7,9 @@ const themes = {
 
 // Функция для получения темы по номеру уровня
 export function getTheme(level) {
-  if (!themes.hasOwnProperty(level)) {
+  if (!Object.prototype.hasOwnProperty.call(themes, level)) {
     throw new Error(`Тема для уровня ${level} не найдена`);
   }
-  
   return themes[level];
 }
 

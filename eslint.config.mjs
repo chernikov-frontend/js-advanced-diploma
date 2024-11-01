@@ -5,24 +5,19 @@ export default [
   {
     files: ["**/*.js"],
     languageOptions: {
-      globals: globals.browser, // Определение глобальных переменных для браузера
+      globals: {
+        ...globals.browser,
+        ...globals.jest, // Поддержка глобальных переменных Jest
+      },
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module', // Разрешение на использование import/export
       },
     },
+    rules: {
+      "no-unused-vars": "warn",        // Установим предупреждение для неиспользуемых переменных
+      "no-prototype-builtins": "off"   // Отключаем правило для hasOwnProperty
+    },
   },
   pluginJs.configs.recommended,
 ];
-
-
-// import globals from "globals";
-// import pluginJs from "@eslint/js";
-
-
-// export default [
-//   {files: ["**/*.js"], languageOptions: {sourceType: "script"}},
-//   {languageOptions: { globals: globals.browser }},
-//   pluginJs.configs.recommended,
-// ];  - дефолтный вариант не работает 
-
