@@ -2,55 +2,80 @@
 import { generateTeam, playerClasses, enemyClasses } from './generators';
 import PositionedCharacter from './PositionedCharacter';
 import { getTheme } from './themes';
+import GameState from './GameState';
+import GamePlay from './GamePlay'
 
 export default class GameController {
-  constructor(gamePlay) {
+  constructor(gamePlay, stateService) {
     this.gamePlay = gamePlay;
-    this.currentLevel = 1; // Начальный уровень
+    this.stateService = stateService;
+    this.gameState = GameState.from({});
+    this.currentLevel = 1;
+    this.selectedCharacterIndex = null;
   }
 
   init() {
-    this.gamePlay.drawUi(getTheme(this.currentLevel)); // Устанавливаем тему для поля
-
-    this.playerTeam = generateTeam(playerClasses, 1, 2); // Генерация команд
+    this.gameState.currentTurn = 'player';
+    this.gamePlay.drawUi(getTheme(this.currentLevel));
+    this.playerTeam = generateTeam(playerClasses, 1, 2);
     this.enemyTeam = generateTeam(enemyClasses, 1, 2);
-
     this.positionCharacters();
 
-    // Подключение обработчиков событий
+    // Подписка на событие клика по ячейке
+    this.subscribeToCellClick();
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
   }
 
+  // Метод для подписки на событие клика по ячейке
+  subscribeToCellClick() {
+    this.gamePlay.addCellClickListener(this.onCellClick.bind(this)); // Привязка onCellClick к контексту GameController
+  }
+
   positionCharacters() {
-    // Получаем уникальные позиции для персонажей игроков и врагов
     const playerPositions = this.generateUniquePositions([0, 1]);
     const enemyPositions = this.generateUniquePositions([6, 7]);
 
-    // Создаем массив с объектами PositionedCharacter для игроков и врагов
     this.positionedCharacters = [
       ...this.playerTeam.characters.map((character, index) => new PositionedCharacter(character, playerPositions[index])),
       ...this.enemyTeam.characters.map((character, index) => new PositionedCharacter(character, enemyPositions[index]))
     ];
 
-    // Перерисовываем позиции на игровом поле
     this.gamePlay.redrawPositions(this.positionedCharacters);
+  }
+
+  onCellClick(index) {
+    const character = this.getCharacterAtPosition(index);
+
+    // Проверка, есть ли персонаж игрока в ячейке
+    if (character && playerClasses.includes(character.character.constructor)) {
+      // Снимаем выделение с предыдущего персонажа, если он был выделен
+      if (this.selectedCharacterIndex !== null) {
+        this.gamePlay.deselectCell(this.selectedCharacterIndex);
+      }
+
+      // Выделяем текущую ячейку и сохраняем ее индекс
+      this.gamePlay.selectCell(index);
+      this.selectedCharacterIndex = index;
+    } else {
+      // Показ сообщения об ошибке, если выбран не персонаж игрока или пустая ячейка
+      GamePlay.showError('Выберите своего персонажа для начала хода');
+    }
   }
 
   onCellEnter(index) {
     const positionedCharacter = this.getCharacterAtPosition(index);
     if (positionedCharacter) {
       const tooltipMessage = this.createCharacterTooltip(positionedCharacter.character);
-      this.gamePlay.showCellTooltip(tooltipMessage, index); // Отображаем информацию о персонаже
+      this.gamePlay.showCellTooltip(tooltipMessage, index);
     }
   }
 
   onCellLeave(index) {
-    this.gamePlay.hideCellTooltip(index); // Скрытие информации о персонаже
+    this.gamePlay.hideCellTooltip(index);
   }
 
   getCharacterAtPosition(index) {
-    // Ищем персонажа на позиции, используя positionedCharacters
     return this.positionedCharacters.find(positionedCharacter => positionedCharacter.position === index);
   }
 
