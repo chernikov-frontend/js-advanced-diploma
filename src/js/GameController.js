@@ -1,9 +1,10 @@
-// src/js/GameController.js
+import GamePlay from './GamePlay';
 import { generateTeam, playerClasses, enemyClasses } from './generators';
 import PositionedCharacter from './PositionedCharacter';
 import { getTheme } from './themes';
 import GameState from './GameState';
-import GamePlay from './GamePlay'
+import cursors from './cursors';
+import { isMoveAllowed } from './characterUtils';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -12,6 +13,7 @@ export default class GameController {
     this.gameState = GameState.from({});
     this.currentLevel = 1;
     this.selectedCharacterIndex = null;
+    this.selectedCharacter = null; // Добавлено для хранения выбранного персонажа
   }
 
   init() {
@@ -29,7 +31,7 @@ export default class GameController {
 
   // Метод для подписки на событие клика по ячейке
   subscribeToCellClick() {
-    this.gamePlay.addCellClickListener(this.onCellClick.bind(this)); // Привязка onCellClick к контексту GameController
+    this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
   }
 
   positionCharacters() {
@@ -47,32 +49,62 @@ export default class GameController {
   onCellClick(index) {
     const character = this.getCharacterAtPosition(index);
 
-    // Проверка, есть ли персонаж игрока в ячейке
+    // Если клик по ячейке с персонажем игрока — выделение
     if (character && playerClasses.includes(character.character.constructor)) {
-      // Снимаем выделение с предыдущего персонажа, если он был выделен
       if (this.selectedCharacterIndex !== null) {
-        this.gamePlay.deselectCell(this.selectedCharacterIndex);
+        this.gamePlay.deselectCell(this.selectedCharacterIndex); // Снятие выделения с предыдущего персонажа
       }
 
-      // Выделяем текущую ячейку и сохраняем ее индекс
-      this.gamePlay.selectCell(index);
-      this.selectedCharacterIndex = index;
+      this.gamePlay.selectCell(index); // Выделение нового персонажа
+      this.selectedCharacterIndex = index; // Обновление индекса выбранного персонажа
+      this.selectedCharacter = character; // Сохраняем объект выбранного персонажа
+
+    // Если выбранная ячейка доступна для перемещения, передвигаем персонажа
+    } else if (this.selectedCharacter && isMoveAllowed(this.selectedCharacter.character, this.selectedCharacter.position, index)) {
+      this.moveCharacter(index); // Перемещаем персонажа
+      this.switchTurn(); // Переключаем ход
+
     } else {
-      // Показ сообщения об ошибке, если выбран не персонаж игрока или пустая ячейка
-      GamePlay.showError('Выберите своего персонажа для начала хода');
+      GamePlay.showError('Выберите доступного для перемещения персонажа или ячейку');
     }
   }
 
   onCellEnter(index) {
     const positionedCharacter = this.getCharacterAtPosition(index);
+
     if (positionedCharacter) {
       const tooltipMessage = this.createCharacterTooltip(positionedCharacter.character);
       this.gamePlay.showCellTooltip(tooltipMessage, index);
     }
+
+    // Определение действия при наведении
+    if (positionedCharacter && playerClasses.includes(positionedCharacter.character.constructor)) {
+      this.gamePlay.setCursor(cursors.pointer); // Курсор "pointer" для выбора
+    } else if (this.selectedCharacterIndex !== null && isMoveAllowed(this.selectedCharacter.character, this.selectedCharacter.position, index)) {
+      this.gamePlay.setCursor(cursors.pointer); // Курсор "pointer" для допустимого перемещения
+      this.gamePlay.selectCell(index, 'green'); // Подсветка ячейки зелёным
+    } else {
+      this.gamePlay.setCursor(cursors.notallowed); // Курсор "notallowed" для недопустимого действия
+    }
   }
 
   onCellLeave(index) {
-    this.gamePlay.hideCellTooltip(index);
+    this.gamePlay.hideCellTooltip(index); // Скрытие подсказки при уходе с ячейки
+    this.gamePlay.deselectCell(index); // Снятие подсветки ячейки
+  }
+
+  // Метод для перемещения персонажа
+  moveCharacter(newPosition) {
+    this.selectedCharacter.position = newPosition; // Обновляем позицию персонажа
+    this.gamePlay.deselectCell(this.selectedCharacterIndex); // Снимаем выделение
+    this.selectedCharacterIndex = null;
+    this.selectedCharacter = null;
+    this.gamePlay.redrawPositions(this.positionedCharacters); // Перерисовываем позиции
+  }
+
+  // Переключение хода
+  switchTurn() {
+    this.gameState.currentTurn = this.gameState.currentTurn === 'player' ? 'computer' : 'player';
   }
 
   getCharacterAtPosition(index) {
