@@ -9,29 +9,6 @@ export default class Team {
 }
 
 
-// export default class Team {
-//   constructor() {
-//     this._characters = [];
-//   }
-
-//   add(character) {
-//     if (!(character instanceof Character)) { // Предположим, что есть базовый класс Character
-//       throw new Error('Некорректный персонаж');
-//     }
-//     this._characters.push(character);
-//   }
-
-//   get characters() {
-//     return [...this._characters]; // Возвращаем копию массива, чтобы предотвратить изменение оригинального списка извне
-//   }
-// }
-
-
-
-
-
-
-
 /**
  * Класс, представляющий персонажей команды
  *
@@ -45,6 +22,3 @@ export default class Team {
 //  * team.characters // [swordsman, bowman]
 //  * ```
 //  * */
-// export default class Team {
-//   // TODO: write your logic here
-// }

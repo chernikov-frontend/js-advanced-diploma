@@ -6,10 +6,10 @@ import Bowman from '../characters/Bowman';
 import Vampire from '../characters/Vampire';
 import Magician from '../characters/Magician';
 import Daemon from '../characters/Daemon';
+import GameStateService from '../GameStateService';
 
 // Мок для gamePlay
 jest.mock('../GamePlay');
-
 
 const mockCharacter = {
     level: 3,
@@ -20,60 +20,82 @@ const mockCharacter = {
 
 const expectedTooltip = '🎖 3 ⚔ 40 🛡 10 ❤ 100';
 
-describe('GameController createCharacterTooltip', () => {
+describe('проверки характеристик персонажей', () => {
     let gameController;
 
-    beforeEach(() => {
+    beforeEach(() => { 
         // Инициализируем GameController с мок-объектом GamePlay
-        gameController = new GameController(new GamePlay());
+        gameController = new GameController(new GamePlay(), {});
     });
 
     test('должен корректно формировать строку с характеристиками персонажа', () => {
         const tooltip = gameController.createCharacterTooltip(mockCharacter);
         expect(tooltip).toBe(expectedTooltip);
     });
+
+    const characterTestCases = [
+        { CharacterClass: Swordsman, name: 'Мечник', expectedMoveRange: 4, expectedAttackRange: 1 },
+        { CharacterClass: Undead, name: 'Скелет', expectedMoveRange: 4, expectedAttackRange: 1 },
+        { CharacterClass: Bowman, name: 'Лучник', expectedMoveRange: 2, expectedAttackRange: 2 },
+        { CharacterClass: Vampire, name: 'Вампир', expectedMoveRange: 2, expectedAttackRange: 2 },
+        { CharacterClass: Magician, name: 'Маг', expectedMoveRange: 1, expectedAttackRange: 4 },
+        { CharacterClass: Daemon, name: 'Демон', expectedMoveRange: 1, expectedAttackRange: 4 },
+    ];
+
+    test.each(characterTestCases)(
+        '$name имеет радиус движения $expectedMoveRange и радиус атаки $expectedAttackRange',
+        ({ CharacterClass, expectedMoveRange, expectedAttackRange }) => {
+            const character = new CharacterClass(1);
+            expect(gameController.getMoveRange(character)).toBe(expectedMoveRange);
+            expect(gameController.getAttackRange(character)).toBe(expectedAttackRange);
+        }
+    );
+
+    test.each(characterTestCases)(
+        '$name может атаковать и двигаться в пределах допустимого диапазона',
+        ({ CharacterClass }) => {
+            const character = new CharacterClass(1);
+            const moveRange = gameController.getMoveRange(character);
+            const attackRange = gameController.getAttackRange(character);
+            const position = 27; // произвольная позиция на доске
+
+            const allowedMoves = gameController.calcRange(position, moveRange);
+            const allowedAttacks = gameController.calcRange(position, attackRange);
+
+            expect(allowedMoves.length).toBeGreaterThan(0);
+            expect(allowedAttacks.length).toBeGreaterThan(0);
+        }
+    );
 });
 
-describe('GameController - проверка радиуса атаки и движения для каждого класса персонажей', () => {
+describe('проверка загрузки состояния игры', () => {
+    let gameStateService;
     let gameController;
 
     beforeEach(() => {
-        gameController = new GameController(new GamePlay());
+        gameStateService = new GameStateService();
+        gameController = new GameController(new GamePlay(), gameStateService);
     });
 
-    test('Swordsman имеет радиус движения 4 и радиус атаки 1', () => {
-        const swordsman = new Swordsman(1);
-        expect(gameController.getMoveRange(swordsman)).toBe(4);
-        expect(gameController.getAttackRange(swordsman)).toBe(1);
+    test('должен корректно загружать сохраненное состояние', () => {
+        gameStateService.load = jest.fn(() => ({
+            currentLevel: 2,
+            currentTurn: 'player',
+            positionedCharacters: [],
+            maxScore: 50
+        }));
+        
+        gameController.loadGameState();
+        expect(gameController.currentLevel).toBe(2);
+        expect(gameController.maxScore).toBe(50);
     });
 
-    test('Undead имеет радиус движения 4 и радиус атаки 1', () => {
-        const undead = new Undead(1);
-        expect(gameController.getMoveRange(undead)).toBe(4);
-        expect(gameController.getAttackRange(undead)).toBe(1);
-    });
+    test('должен корректно обрабатывать ошибку при загрузке', () => {
+        gameStateService.load = jest.fn(() => {
+            throw new Error('Load failed');
+        });
 
-    test('Bowman имеет радиус движения 2 и радиус атаки 2', () => {
-        const bowman = new Bowman(1);
-        expect(gameController.getMoveRange(bowman)).toBe(2);
-        expect(gameController.getAttackRange(bowman)).toBe(2);
-    });
-
-    test('Vampire имеет радиус движения 2 и радиус атаки 2', () => {
-        const vampire = new Vampire(1);
-        expect(gameController.getMoveRange(vampire)).toBe(2);
-        expect(gameController.getAttackRange(vampire)).toBe(2);
-    });
-
-    test('Magician имеет радиус движения 1 и радиус атаки 4', () => {
-        const magician = new Magician(1);
-        expect(gameController.getMoveRange(magician)).toBe(1);
-        expect(gameController.getAttackRange(magician)).toBe(4);
-    });
-
-    test('Daemon имеет радиус движения 1 и радиус атаки 4', () => {
-        const daemon = new Daemon(1);
-        expect(gameController.getMoveRange(daemon)).toBe(1);
-        expect(gameController.getAttackRange(daemon)).toBe(4);
+        gameController.loadGameState();
+        expect(GamePlay.showError).toHaveBeenCalledWith('Не удалось загрузить игру.');
     });
 });
