@@ -556,9 +556,21 @@ export default class GameController {
     character.health = Math.min(100, character.health + 80);
   }
 
+  // Заглушка при окончании всех уровней игры
+  gameOver() {
+    if (this.currentLevel > this.maxLevel) {
+      GamePlay.showMessage('Поздравляем! Вы прошли все уровни игры! Спасибо за игру!');
+      this.gamePlay.setCursor(cursors.notallowed);
+      return;
+    }
+  }
+
   // Метод для начала нового уровня игры
   startNextLevel() {
     this.currentLevel += 1;
+
+        // Проверка на окончание игры
+        this.gameOver();
   
     // Изменяем тему игры
     this.gamePlay.drawUi(getTheme(this.currentLevel));
