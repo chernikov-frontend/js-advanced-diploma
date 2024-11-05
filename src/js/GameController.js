@@ -570,14 +570,20 @@ export default class GameController {
       }
     });
   
+    // Генерируем нового персонажа для команды игрока
+    const newPlayerCharacter = generateTeam(playerClasses, this.currentLevel, 1).characters[0];
+    const playerPositions = this.generateUniquePositions([0, 1], 1);
+    const newPlayerPositionedCharacter = new PositionedCharacter(newPlayerCharacter, playerPositions[0]);
+  
     // Генерируем новую команду противника с увеличенной сложностью
     const newEnemyTeam = generateTeam(enemyClasses, this.currentLevel, this.currentLevel + 1);
     const enemyPositions = this.generateUniquePositions([6, 7], newEnemyTeam.characters.length);
     const newEnemyCharacters = newEnemyTeam.characters.map((character, index) => new PositionedCharacter(character, enemyPositions[index]));
   
-    // Добавляем новых врагов к уже существующим персонажам игрока
+    // Добавляем нового игрока и новых врагов к уже существующим персонажам игрока
     this.positionedCharacters = [
       ...this.positionedCharacters.filter((posChar) => playerClasses.includes(posChar.character.constructor)),
+      newPlayerPositionedCharacter,
       ...newEnemyCharacters
     ];
   
