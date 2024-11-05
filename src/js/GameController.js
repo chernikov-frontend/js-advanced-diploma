@@ -27,22 +27,15 @@ export default class GameController {
   init() {
     // Попытка загрузить сохраненное состояние игры
     try {
-      const loadedState = this.stateService.load();
-      if (loadedState) {
-        this.gameState = GameState.from(loadedState);
-        this.currentLevel = this.gameState.currentLevel;
-        this.maxScore = this.gameState.maxScore;
-
-        // Рисуем интерфейс
-        this.gamePlay.drawUi(getTheme(this.currentLevel));
-        this.positionedCharacters = this.gameState.positionedCharacters;
-        this.gamePlay.redrawPositions(this.positionedCharacters);
-      } else {
-        this.startNewGame(); // Если нет сохраненного состояния, начинаем новую игру
-      }
+        const loadedState = this.stateService.load();
+        if (loadedState) {
+            this.loadGameState(); // Метод загрузки состояния игры, описанный ниже
+        } else {
+            this.startNewGame(); // Если нет сохраненного состояния, начинаем новую игру
+        }
     } catch (e) {
-      console.warn('Не удалось загрузить игру, начинаем новую игру.');
-      this.startNewGame();
+        console.warn('Не удалось загрузить игру, начинаем новую игру.');
+        this.startNewGame();
     }
 
     // Устанавливаем слушатели
@@ -50,8 +43,7 @@ export default class GameController {
     this.gamePlay.addNewGameListener(this.startNewGame.bind(this));
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
-  }
-
+}
   // Game Over, New Game и статистика
   onNewGameClick() {
     this.currentLevel = 1;
@@ -87,71 +79,123 @@ export default class GameController {
   calculateScore() {
     let score = 0;
     this.positionedCharacters.forEach((posChar) => {
-      if (playerClasses.includes(posChar.character.constructor)) {
-        score += posChar.character.health; 
+      if (posChar && posChar.character && playerClasses.includes(posChar.character.constructor)) {
+        score += posChar.character.health;
       }
     });
     return score;
   }
 
     // Метод для сохранения состояния игры
-  saveGameState() {
-    try {
-      // Формируем состояние игры для сохранения
-      const gameState = GameState.from({
-        currentLevel: this.currentLevel,
-        currentTurn: this.gameState.currentTurn,
-        positionedCharacters: this.positionedCharacters,
-        maxScore: this.maxScore,
-      });
-  
-      this.stateService.save(gameState);
-      console.log('Состояние игры успешно сохранено:', gameState);
-    } catch (e) {
-      console.error('Ошибка при сохранении состояния игры:', e);
-      GamePlay.showError('Не удалось сохранить игру.');
+    saveGameState() {
+      try {
+        console.log('Попытка сохранить состояние игры...');
+        if (!this.positionedCharacters || !Array.isArray(this.positionedCharacters)) {
+          throw new Error('Некорректные данные персонажей для сохранения.');
+        }
+    
+        const gameState = {
+          currentLevel: this.currentLevel,
+          currentTurn: this.gameState.currentTurn,
+          maxScore: this.maxScore,
+          positionedCharacters: this.positionedCharacters.map((posChar) => {
+            if (!posChar.character) {
+              throw new Error('Некорректные данные персонажа для сохранения.');
+            }
+    
+            return {
+              character: {
+                type: posChar.character.constructor.name,
+                level: posChar.character.level,
+                attack: posChar.character.attack,
+                defence: posChar.character.defence,
+                health: posChar.character.health,
+              },
+              position: posChar.position,
+            };
+          }),
+        };
+    
+        console.log('Сформированное состояние игры для сохранения:', gameState);
+    
+        this.stateService.save(gameState);
+        console.log('Состояние игры успешно сохранено:', gameState);
+      } catch (e) {
+        console.error('Ошибка при сохранении состояния игры:', e);
+        GamePlay.showError('Не удалось сохранить игру.');
+      }
     }
-  }
+    
 
   // Метод для загрузки состояния игры
   loadGameState() {
     try {
-      console.log('Попытка загрузки состояния игры...');
-      const loadedState = this.stateService.load();
+        console.log('Попытка загрузки состояния игры из localStorage...');
+        const loadedData = this.stateService.load();
   
-      if (!loadedState) {
-        // Если состояние не было сохранено ранее или повреждено, начинаем новую игру
-        console.warn('Сохраненное состояние отсутствует. Начинаем новую игру.');
-        this.startNewGame();
-        return;
-      }
+        console.log('Загруженные данные:', loadedData);
   
-      // Применяем загруженное состояние
-      if (typeof loadedState.currentLevel === 'number' && Array.isArray(loadedState.positionedCharacters)) {
+        if (!loadedData || typeof loadedData !== 'object' || !Array.isArray(loadedData.positionedCharacters)) {
+            console.warn('Загруженные данные отсутствуют или имеют неверный формат. Начинаем новую игру.');
+            this.startNewGame();
+            return;
+        }
+  
         console.log('Состояние игры успешно загружено, применяем параметры...');
   
-        this.currentLevel = loadedState.currentLevel;
-        this.gameState.currentTurn = loadedState.currentTurn || 'player';
-        this.positionedCharacters = loadedState.positionedCharacters;
-        this.maxScore = loadedState.maxScore || 0;
+        this.currentLevel = loadedData.currentLevel;
+        this.gameState.currentTurn = loadedData.currentTurn || 'player';
+        this.maxScore = loadedData.maxScore || 0;
   
-        // Отрисовка интерфейса и персонажей
+        // Восстанавливаем персонажей на поле с проверкой на корректность
+        this.positionedCharacters = loadedData.positionedCharacters.map((savedChar) => {
+            if (!savedChar.character || typeof savedChar.position !== 'number') {
+                throw new Error('Некорректные данные персонажа');
+            }
+  
+            let character;
+            switch (savedChar.character.type) {
+                case 'Swordsman':
+                    character = new Swordsman(savedChar.character.level);
+                    break;
+                case 'Bowman':
+                    character = new Bowman(savedChar.character.level);
+                    break;
+                case 'Magician':
+                    character = new Magician(savedChar.character.level);
+                    break;
+                case 'Vampire':
+                    character = new Vampire(savedChar.character.level);
+                    break;
+                case 'Undead':
+                    character = new Undead(savedChar.character.level);
+                    break;
+                case 'Daemon':
+                    character = new Daemon(savedChar.character.level);
+                    break;
+                default:
+                    throw new Error(`Неизвестный тип персонажа: ${savedChar.character.type}`);
+            }
+  
+            character.attack = savedChar.character.attack;
+            character.defence = savedChar.character.defence;
+            character.health = savedChar.character.health;
+  
+            return new PositionedCharacter(character, savedChar.position);
+        });
+  
+        console.log('Персонажи успешно восстановлены:', this.positionedCharacters);
+  
         this.gamePlay.drawUi(getTheme(this.currentLevel));
         this.gamePlay.redrawPositions(this.positionedCharacters);
-        console.log('Интерфейс успешно отрисован.');
-      } else {
-        // Если данные не соответствуют ожиданиям, начинаем новую игру
-        console.warn('Загруженные данные повреждены или невалидны. Начинаем новую игру.');
-        this.startNewGame();
-      }
+  
+        console.log('Интерфейс успешно отрисован, игра восстановлена из сохраненного состояния.');
     } catch (e) {
-      console.error('Ошибка при загрузке сохраненного состояния:', e);
-      GamePlay.showError('Не удалось загрузить игру. Начинаем новую игру.');
-      this.startNewGame();
+        console.error('Ошибка при загрузке сохраненного состояния:', e);
+        GamePlay.showError('Не удалось загрузить игру. Начинаем новую игру.');
+        this.startNewGame();
     }
   }
-  
-  
   
   
 
@@ -282,6 +326,8 @@ export default class GameController {
   switchTurn() {
     this.gameState.currentTurn = this.gameState.currentTurn === 'player' ? 'computer' : 'player';
     console.log(`Ход перешел к ${this.gameState.currentTurn}`);
+    this.saveGameState(); // Сохраняем состояние после каждого хода
+    
     if (this.gameState.currentTurn === 'computer') {
       this.computerAction();
     }
@@ -513,42 +559,36 @@ export default class GameController {
   // Метод для начала нового уровня игры
   startNextLevel() {
     this.currentLevel += 1;
-
+  
     // Изменяем тему игры
     this.gamePlay.drawUi(getTheme(this.currentLevel));
-
+  
     // Повышаем уровень всех оставшихся персонажей игрока
     this.positionedCharacters.forEach((posChar) => {
       if (playerClasses.includes(posChar.character.constructor)) {
         this.levelUp(posChar.character);
       }
     });
-
+  
     // Генерируем новую команду противника с увеличенной сложностью
     const newEnemyTeam = generateTeam(enemyClasses, this.currentLevel, this.currentLevel + 1);
     const enemyPositions = this.generateUniquePositions([6, 7], newEnemyTeam.characters.length);
     const newEnemyCharacters = newEnemyTeam.characters.map((character, index) => new PositionedCharacter(character, enemyPositions[index]));
-
-    // Генерируем нового персонажа для игрока
-    const newPlayerTeam = generateTeam(playerClasses, this.currentLevel, 1);
-    const newPlayerPositions = this.generateUniquePositions([0, 1], newPlayerTeam.characters.length);
-    const newPlayerCharacters = newPlayerTeam.characters.map((character, index) => new PositionedCharacter(character, newPlayerPositions[index]));
-
-    // Обновляем список персонажей, добавляя новых врагов и нового игрока к уже существующим персонажам игрока
+  
+    // Добавляем новых врагов к уже существующим персонажам игрока
     this.positionedCharacters = [
       ...this.positionedCharacters.filter((posChar) => playerClasses.includes(posChar.character.constructor)),
-      ...newPlayerCharacters,
       ...newEnemyCharacters
     ];
-
+  
     this.gamePlay.redrawPositions(this.positionedCharacters);
-
+  
     // Переключаем ход на игрока
     this.gameState.currentTurn = 'player';
     console.log(`Новый уровень ${this.currentLevel} начат!`);
-
+  
     // Сохраняем текущее состояние игры
     this.saveGameState();
-}
+  }
 
 }
