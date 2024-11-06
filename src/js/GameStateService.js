@@ -11,7 +11,7 @@ export default class GameStateService {
     try {
       return JSON.parse(this.storage.getItem('state'));
     } catch (e) {
-      throw new Error('Invalid state');
+      console.error('Ошибка при загрузке состояния игры:', e);
     }
   }
 }

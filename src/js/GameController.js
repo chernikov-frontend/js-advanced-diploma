@@ -34,9 +34,9 @@ export default class GameController {
             this.startNewGame(); // Если нет сохраненного состояния, начинаем новую игру
         }
     } catch (e) {
-        console.warn('Не удалось загрузить игру, начинаем новую игру.');
-        this.startNewGame();
-    }
+      console.warn('Не удалось загрузить игру, начинаем новую игру.', e);
+      this.startNewGame();
+  }
 
     // Устанавливаем слушатели
     this.subscribeToCellClick();
@@ -132,27 +132,27 @@ export default class GameController {
     try {
         console.log('Попытка загрузки состояния игры из localStorage...');
         const loadedData = this.stateService.load();
-  
-        console.log('Загруженные данные:', loadedData);
-  
+
+        // Проверка на корректность загруженных данных
         if (!loadedData || typeof loadedData !== 'object' || !Array.isArray(loadedData.positionedCharacters)) {
             console.warn('Загруженные данные отсутствуют или имеют неверный формат. Начинаем новую игру.');
             this.startNewGame();
             return;
         }
-  
+
         console.log('Состояние игры успешно загружено, применяем параметры...');
-  
+
+        // Применение загруженных параметров
         this.currentLevel = loadedData.currentLevel;
         this.gameState.currentTurn = loadedData.currentTurn || 'player';
         this.maxScore = loadedData.maxScore || 0;
-  
+
         // Восстанавливаем персонажей на поле с проверкой на корректность
         this.positionedCharacters = loadedData.positionedCharacters.map((savedChar) => {
             if (!savedChar.character || typeof savedChar.position !== 'number') {
                 throw new Error('Некорректные данные персонажа');
             }
-  
+
             let character;
             switch (savedChar.character.type) {
                 case 'Swordsman':
@@ -176,19 +176,20 @@ export default class GameController {
                 default:
                     throw new Error(`Неизвестный тип персонажа: ${savedChar.character.type}`);
             }
-  
+
             character.attack = savedChar.character.attack;
             character.defence = savedChar.character.defence;
             character.health = savedChar.character.health;
-  
+
             return new PositionedCharacter(character, savedChar.position);
         });
-  
+
         console.log('Персонажи успешно восстановлены:', this.positionedCharacters);
-  
+
+        // Обновляем интерфейс
         this.gamePlay.drawUi(getTheme(this.currentLevel));
         this.gamePlay.redrawPositions(this.positionedCharacters);
-  
+
         console.log('Интерфейс успешно отрисован, игра восстановлена из сохраненного состояния.');
     } catch (e) {
         console.error('Ошибка при загрузке сохраненного состояния:', e);
@@ -196,8 +197,7 @@ export default class GameController {
         this.startNewGame();
     }
   }
-  
-  
+
 
   // Подписка на событие клика по ячейке
   subscribeToCellClick() {
@@ -419,44 +419,23 @@ export default class GameController {
   calcRange(position, range) {
     const boardSize = this.boardSize; 
     const rangePositions = [];
-    const leftBorder = [...Array(boardSize).keys()].map(i => i * boardSize);
-    const rightBorder = [...Array(boardSize).keys()].map(i => (i * boardSize) + boardSize - 1);
-
-    const directions = [
-      { dx: 1, dy: 0 },   // вправо
-      { dx: -1, dy: 0 },  // влево
-      { dx: 0, dy: 1 },   // вниз
-      { dx: 0, dy: -1 },  // вверх
-      { dx: 1, dy: 1 },   // вправо-вниз (диагональ)
-      { dx: -1, dy: -1 }, // влево-вверх (диагональ)
-      { dx: 1, dy: -1 },  // вправо-вверх (диагональ)
-      { dx: -1, dy: 1 }   // влево-вниз (диагональ)
-    ];
-
-    directions.forEach(({ dx, dy }) => {
-      for (let step = 1; step <= range; step++) {
-        const x = (position % boardSize) + dx * step;
-        const y = Math.floor(position / boardSize) + dy * step;
-
-        // Проверка на выход за границы поля
-        if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) break;
-
-        const newPosition = y * boardSize + x;
-
-        // Прерываем движение, если пересекаем границы
-        if (
-          (leftBorder.includes(position) && dx === -1 && x === boardSize - 1) ||
-          (rightBorder.includes(position) && dx === 1 && x === 0)
-        ) {
-          break;
+  
+    const startX = position % boardSize;
+    const startY = Math.floor(position / boardSize);
+  
+    for (let y = 0; y < boardSize; y++) {
+      for (let x = 0; x < boardSize; x++) {
+        const distance = Math.sqrt((x - startX) ** 2 + (y - startY) ** 2);
+        if (distance <= range) {
+          const newPosition = y * boardSize + x;
+          rangePositions.push(newPosition);
         }
-
-        rangePositions.push(newPosition);
       }
-    });
-
+    }
+  
     return rangePositions;
   }
+  
 
 
   // Метод для нахождения допустимых позиций для атаки
