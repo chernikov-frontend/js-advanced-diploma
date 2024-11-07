@@ -27,53 +27,68 @@ export default class GameController {
   init() {
     // Попытка загрузить сохраненное состояние игры
     try {
-        const loadedState = this.stateService.load();
-        if (loadedState) {
-            this.loadGameState(); // Метод загрузки состояния игры, описанный ниже
-        } else {
-            this.startNewGame(); // Если нет сохраненного состояния, начинаем новую игру
-        }
+      const loadedState = this.stateService.load();
+      if (loadedState) {
+        this.loadGameState(); // Метод загрузки состояния игры, описанный ниже
+      } else {
+        this.startNewGame(); // Если нет сохраненного состояния, начинаем новую игру
+      }
     } catch (e) {
       console.warn('Не удалось загрузить игру, начинаем новую игру.', e);
       this.startNewGame();
-  }
-
+    }
+  
     // Устанавливаем слушатели
     this.subscribeToCellClick();
-    this.gamePlay.addNewGameListener(this.startNewGame.bind(this));
+    this.gamePlay.addNewGameListener(this.onNewGameClick.bind(this)); // Обновляем подписку на новую игру
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
-}
-  // Game Over, New Game и статистика
+  }
+
   onNewGameClick() {
+    // Сброс уровня и очков
     this.currentLevel = 1;
-    this.gameState.maxPoints = Math.max(this.gameState.maxPoints || 0, this.gameState.currentPoints || 0);
+    this.gameState.maxPoints = Math.max(this.gameState.maxPoints || 0, this.gameState.currentPoints || 0); // Сохраняем максимальные очки
     this.gameState.currentPoints = 0;
-    this.startNewGame();  // Перезапускаем игру
+  
+    // Сброс игрового состояния
+    this.gameState = GameState.from({}); 
+  
+    // Начало новой игры
+    this.startNewGame();
+  
+    // Устанавливаем курсор в активное положение
+    this.gamePlay.setCursor(cursors.auto); 
+  
+    // Восстанавливаем все слушатели событий
+    this.subscribeToCellClick();
+    this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
+    this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
+  
     console.log('Новая игра начата!');
   }
 
-    // Метод для начала новой игры
-    startNewGame() {
-      this.positionedCharacters = [];
-      this.currentLevel = 1;
-      this.gameState = GameState.from({});
-      this.playerTeam = generateTeam(playerClasses, 1, 2);
-      this.enemyTeam = generateTeam(enemyClasses, 1, 2);
+  // Метод для начала новой игры
+  startNewGame() {
+    this.positionedCharacters = [];
+    this.currentLevel = 1;
+    this.gameState = GameState.from({});
+    this.playerTeam = generateTeam(playerClasses, 1, 2);
+    this.enemyTeam = generateTeam(enemyClasses, 1, 2);
+  
+    // Сначала вызываем drawUi(), чтобы убедиться, что интерфейс создан
+    this.gamePlay.drawUi(getTheme(this.currentLevel));
+  
+    // Затем вызываем positionCharacters() для размещения персонажей
+    this.positionCharacters();
+    this.maxScore = Math.max(this.maxScore, this.calculateScore());
+  
+    // Сохраняем обновленное состояние игры
+    this.saveGameState();
     
-      // Сначала вызываем drawUi(), чтобы убедиться, что интерфейс создан
-      this.gamePlay.drawUi(getTheme(this.currentLevel));
-    
-      // Затем вызываем positionCharacters() для размещения персонажей
-      this.positionCharacters();
-      this.maxScore = Math.max(this.maxScore, this.calculateScore());
-    
-      // Сохраняем обновленное состояние игры
-      this.saveGameState();
-      
-      // Устанавливаем ход игрока
-      this.gameState.currentTurn = 'player';
-    }
+    // Устанавливаем ход игрока
+    this.gameState.currentTurn = 'player';
+  }
 
   // метод подсчета очков
   calculateScore() {
@@ -86,47 +101,46 @@ export default class GameController {
     return score;
   }
 
-    // Метод для сохранения состояния игры
-    saveGameState() {
-      try {
-        console.log('Попытка сохранить состояние игры...');
-        if (!this.positionedCharacters || !Array.isArray(this.positionedCharacters)) {
-          throw new Error('Некорректные данные персонажей для сохранения.');
-        }
-    
-        const gameState = {
-          currentLevel: this.currentLevel,
-          currentTurn: this.gameState.currentTurn,
-          maxScore: this.maxScore,
-          positionedCharacters: this.positionedCharacters.map((posChar) => {
-            if (!posChar.character) {
-              throw new Error('Некорректные данные персонажа для сохранения.');
-            }
-    
-            return {
-              character: {
-                type: posChar.character.constructor.name,
-                level: posChar.character.level,
-                attack: posChar.character.attack,
-                defence: posChar.character.defence,
-                health: posChar.character.health,
-              },
-              position: posChar.position,
-            };
-          }),
-        };
-    
-        console.log('Сформированное состояние игры для сохранения:', gameState);
-    
-        this.stateService.save(gameState);
-        console.log('Состояние игры успешно сохранено:', gameState);
-      } catch (e) {
-        console.error('Ошибка при сохранении состояния игры:', e);
-        GamePlay.showError('Не удалось сохранить игру.');
+  // Метод для сохранения состояния игры
+  saveGameState() {
+    try {
+      console.log('Попытка сохранить состояние игры...');
+      if (!this.positionedCharacters || !Array.isArray(this.positionedCharacters)) {
+        throw new Error('Некорректные данные персонажей для сохранения.');
       }
+  
+      const gameState = {
+        currentLevel: this.currentLevel,
+        currentTurn: this.gameState.currentTurn,
+        maxScore: this.maxScore,
+        positionedCharacters: this.positionedCharacters.map((posChar) => {
+          if (!posChar.character) {
+            throw new Error('Некорректные данные персонажа для сохранения.');
+          }
+  
+          return {
+            character: {
+              type: posChar.character.constructor.name,
+              level: posChar.character.level,
+              attack: posChar.character.attack,
+              defence: posChar.character.defence,
+              health: posChar.character.health,
+            },
+            position: posChar.position,
+          };
+        }),
+      };
+  
+      console.log('Сформированное состояние игры для сохранения:', gameState);
+  
+      this.stateService.save(gameState);
+      console.log('Состояние игры успешно сохранено:', gameState);
+    } catch (e) {
+      console.error('Ошибка при сохранении состояния игры:', e);
+      GamePlay.showError('Не удалось сохранить игру.');
     }
+  }
     
-
   // Метод для загрузки состояния игры
   loadGameState() {
     try {
@@ -198,7 +212,6 @@ export default class GameController {
     }
   }
 
-
   // Подписка на событие клика по ячейке
   subscribeToCellClick() {
     this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
@@ -215,7 +228,7 @@ export default class GameController {
     ];
 
     this.gamePlay.redrawPositions(this.positionedCharacters);
-}
+  }
 
   // Определение диапазона перемещения
   getMoveRange(character) {
@@ -233,28 +246,35 @@ export default class GameController {
     return 1;
   }
 
-
   // Проверка доступности ячейки в радиусе (для атаки)
   isWithinRadius(currentPos, targetPos, radius) {
-    const x1 = currentPos % 8;
-    const y1 = Math.floor(currentPos / 8);
-    const x2 = targetPos % 8;
-    const y2 = Math.floor(targetPos / 8);
+    const boardSize = this.boardSize;
+    const x1 = currentPos % boardSize;
+    const y1 = Math.floor(currentPos / boardSize);
+    const x2 = targetPos % boardSize;
+    const y2 = Math.floor(targetPos / boardSize);
   
-    // Используем максимальное расстояние по осям, чтобы корректно учитывать диагонали и прямое движение
-    const distance = Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
-    return distance <= radius;
+    // Используем максимальное из абсолютных разниц по осям для учета всех направлений
+    const distanceX = Math.abs(x1 - x2);
+    const distanceY = Math.abs(y1 - y2);
+    
+    // Проверяем, что цель находится в пределах заданного радиуса
+    return (distanceX <= radius && distanceY <= radius);
   }
-
 
   // Проверка допустимости перемещения (по прямой или диагонали)
   isValidMove(startPos, targetPos) {
+    // Если нет выбранного персонажа, движение невалидно
+    if (!this.selectedCharacter || !this.selectedCharacter.character) {
+      return false;
+    }
+  
     const boardSize = this.boardSize;
     const x1 = startPos % boardSize;
     const y1 = Math.floor(startPos / boardSize);
     const x2 = targetPos % boardSize;
     const y2 = Math.floor(targetPos / boardSize);
-    
+  
     const distanceX = Math.abs(x2 - x1);
     const distanceY = Math.abs(y2 - y1);
   
@@ -347,6 +367,12 @@ export default class GameController {
     if (this.gameState.currentTurn === 'computer') {
       this.computerAction();
     }
+  
+    // Если у игрока не осталось персонажей, завершаем игру
+    const playerCharactersLeft = this.positionedCharacters.some((posChar) => playerClasses.includes(posChar.character.constructor));
+    if (!playerCharactersLeft) {
+      this.gameOver();
+    }
   }
 
   // Наведение на ячейку
@@ -421,14 +447,21 @@ export default class GameController {
     return `🎖 ${character.level} ⚔ ${character.attack} 🛡 ${character.defence} ❤ ${character.health}`;
   }
 
-  generateUniquePositions(columns, count) {
+  generateUniquePositions(columns, count, existingCharacters = []) {
     const positions = new Set();
+    const existingPositions = new Set(existingCharacters.map((char) => char.position)); // Сбор всех занятых позиций
+  
     while (positions.size < count) {
-        const position = Math.floor(Math.random() * 8) * 8 + columns[Math.floor(Math.random() * columns.length)];
+      const position = Math.floor(Math.random() * 8) * 8 + columns[Math.floor(Math.random() * columns.length)];
+  
+      // Проверяем, что позиция не занята ни существующими персонажами, ни уже сгенерированными в этом методе
+      if (!existingPositions.has(position) && !positions.has(position)) {
         positions.add(position);
+      }
     }
+  
     return Array.from(positions);
-}
+  }
 
   // Метод для движения по прямым линиям и диагоналям
   calcRange(position, range) {
@@ -459,8 +492,6 @@ export default class GameController {
   
     return Array.from(rangePositions); // Преобразуем Set в массив и возвращаем
   }
-  
-
 
   // Метод для нахождения допустимых позиций для атаки
   findAllowedToAttack(position, type) {
@@ -560,20 +591,31 @@ export default class GameController {
   }
 
   // Заглушка при окончании всех уровней игры
-  gameOver() {
-    if (this.currentLevel > this.maxLevel) {
+  gameOver(isWin) {
+    if (isWin) {
       GamePlay.showMessage('Поздравляем! Вы прошли все уровни игры! Спасибо за игру!');
-      this.gamePlay.setCursor(cursors.notallowed);
-      return;
+    } else {
+      GamePlay.showMessage('Игра окончена. Вы проиграли.');
     }
+  
+    // Блокируем игровое поле
+    this.gamePlay.setCursor(cursors.notallowed);
+  
+    // Удаляем все подписки на события
+    this.gamePlay.cellClickListeners = [];       // Очищаем слушатели кликов по ячейкам
+    this.gamePlay.cellEnterListeners = [];       // Очищаем слушатели наведения на ячейку
+    this.gamePlay.cellLeaveListeners = [];       // Очищаем слушатели ухода курсора с ячейки
   }
 
   // Метод для начала нового уровня игры
   startNextLevel() {
     this.currentLevel += 1;
-
+  
     // Проверка на окончание игры
-    this.gameOver();
+    if (this.currentLevel > 4 ) {
+      this.gameOver(true); // Игрок завершил все уровни, значит победа
+      return;
+    }
   
     // Изменяем тему игры
     this.gamePlay.drawUi(getTheme(this.currentLevel));
@@ -611,5 +653,4 @@ export default class GameController {
     // Сохраняем текущее состояние игры
     this.saveGameState();
   }
-
 }
