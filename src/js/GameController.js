@@ -240,20 +240,36 @@ export default class GameController {
     const y1 = Math.floor(currentPos / 8);
     const x2 = targetPos % 8;
     const y2 = Math.floor(targetPos / 8);
-    const distance = Math.abs(x1 - x2) + Math.abs(y1 - y2); // Манхэттенское расстояние для учета радиуса
+  
+    // Используем максимальное расстояние по осям, чтобы корректно учитывать диагонали и прямое движение
+    const distance = Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
     return distance <= radius;
   }
 
 
   // Проверка допустимости перемещения (по прямой или диагонали)
   isValidMove(startPos, targetPos) {
-    const x1 = startPos % 8;
-    const y1 = Math.floor(startPos / 8);
-    const x2 = targetPos % 8;
-    const y2 = Math.floor(targetPos / 8);
-
+    const boardSize = this.boardSize;
+    const x1 = startPos % boardSize;
+    const y1 = Math.floor(startPos / boardSize);
+    const x2 = targetPos % boardSize;
+    const y2 = Math.floor(targetPos / boardSize);
+    
+    const distanceX = Math.abs(x2 - x1);
+    const distanceY = Math.abs(y2 - y1);
+  
     // Проверяем, что перемещение происходит по одной линии или по диагонали
-    return (x1 === x2 || y1 === y2 || Math.abs(x1 - x2) === Math.abs(y1 - y2));
+    // Если движение по прямой (горизонтальное или вертикальное)
+    if ((x1 === x2 || y1 === y2) && Math.max(distanceX, distanceY) <= this.getMoveRange(this.selectedCharacter.character)) {
+      return true;
+    }
+  
+    // Если движение по диагонали, учитываем удвоенный диапазон
+    if (distanceX === distanceY && distanceX <= this.getMoveRange(this.selectedCharacter.character) * 2) {
+      return true;
+    }
+  
+    return false;
   }
 
   // Обработка клика по ячейке
@@ -378,8 +394,7 @@ export default class GameController {
         this.gamePlay.setCursor(cursors.notallowed);
       }
     }
-}
-
+  }
 
   onCellLeave(index) {
     this.gamePlay.hideCellTooltip(index);
@@ -415,25 +430,34 @@ export default class GameController {
     return Array.from(positions);
 }
 
-  // Метод calcRange для движения по прямым линиям и диагоналям
+  // Метод для движения по прямым линиям и диагоналям
   calcRange(position, range) {
     const boardSize = this.boardSize; 
-    const rangePositions = [];
+    const rangePositions = new Set(); // Используем Set для исключения дублирования позиций
   
     const startX = position % boardSize;
     const startY = Math.floor(position / boardSize);
   
     for (let y = 0; y < boardSize; y++) {
       for (let x = 0; x < boardSize; x++) {
-        const distance = Math.sqrt((x - startX) ** 2 + (y - startY) ** 2);
-        if (distance <= range) {
+        const distanceX = Math.abs(x - startX);
+        const distanceY = Math.abs(y - startY);
+  
+        // Проверка для прямого движения (горизонтально или вертикально)
+        if ((distanceX === 0 || distanceY === 0) && Math.max(distanceX, distanceY) <= range) {
           const newPosition = y * boardSize + x;
-          rangePositions.push(newPosition);
+          rangePositions.add(newPosition); // Добавляем в Set
+        }
+  
+        // Проверка для диагонального движения, где радиус удваивается
+        if (distanceX === distanceY && distanceX <= range * 2) {
+          const newPosition = y * boardSize + x;
+          rangePositions.add(newPosition); // Добавляем в Set
         }
       }
     }
   
-    return rangePositions;
+    return Array.from(rangePositions); // Преобразуем Set в массив и возвращаем
   }
   
 
@@ -548,8 +572,8 @@ export default class GameController {
   startNextLevel() {
     this.currentLevel += 1;
 
-        // Проверка на окончание игры
-        this.gameOver();
+    // Проверка на окончание игры
+    this.gameOver();
   
     // Изменяем тему игры
     this.gamePlay.drawUi(getTheme(this.currentLevel));
